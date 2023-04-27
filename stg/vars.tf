@@ -3,6 +3,8 @@
 #--------------------------------------------------------------
 #AWS Settings
 variable "region" {}
+variable "shared_credentials_file" {}
+variable "env" {}
 
 #IP Settings
 variable "root_segment" {}
