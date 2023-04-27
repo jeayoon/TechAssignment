@@ -2,16 +2,52 @@
 # Variable Settings
 #--------------------------------------------------------------
 #AWS Settings
-variable "region" {}
-variable "shared_credentials_file" {}
-variable "env" {}
+variable "region" {
+  type    = string
+  default = "ap-northeast-1"
+}
+variable "shared_credentials" {
+  type    = list(string)
+  default = ["~/.aws/credentials"]
+}
+variable "env" {
+  type    = string
+  default = "stg"
+}
 
 #IP Settings
-variable "root_segment" {}
-variable "ec2_public_segment1" {}
-variable "public_segment1_az" {}
+variable "vpc_cidr" {
+  type    = string
+  default = "10.0.0.0/16"
+}
+variable "subnet_names" {
+  type = map(string)
+  default = {
+    "pub1"  = "sb-pub1"
+    "pub2"  = "sb-pub2"
+    "dmz1"  = "sb-dmz1"
+    "dmz2"  = "sb-dmz2"
+    "priv1" = "sb-priv1"
+    "priv2" = "sb-priv2"
+  }
+}
 
-# variable "ec2_launch_ami" {}
-# variable "ec2_instance_type" {}
-variable "my_ip" {}
-variable "my_public_key" {}
+variable "rt_names" {
+  type = map(string)
+  default = {
+    "pub1"  = "route-pub1"
+    "dmz1"  = "route-dmz1"
+    "priv1" = "route-priv1"
+  }
+}
+
+variable "sg_names" {
+  type = map(string)
+  default = {
+    "alb"     = "alb-sg"
+    "efs"     = "efs-sg"
+    "rds"     = "rds-sg"
+    "fargate" = "fargate-sg"
+  }
+}
+
