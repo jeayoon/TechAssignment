@@ -10,7 +10,7 @@ terraform {
     }
   }
   backend "s3" {
-    bucket  = "jy-bucket-tfstate" # s3 bucket name
+    bucket  = "" # s3 bucket name
     region  = "ap-northeast-1"
     key     = "test/terraform.tfstate"
     encrypt = true

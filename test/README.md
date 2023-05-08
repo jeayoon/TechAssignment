@@ -25,7 +25,7 @@ Terraform v1.4.5
 ## Terraform apply progress
 
 1. `~/.aws/credentials` 에 AWS access key & secret key 설정
-2. `terraform init`
+2. `main.tf`에서 `backend "s3"`의 bucket 입력 후 `terraform init`
 3. NW및 ECR Deploy(Task Deploy준비를 위한 사전 Apply)
    1. `main.tf`에서 182행에 있는`##---------Second Deploy---------`부터 맨 아랫 줄 까지 일시적으로 Command out함
    2. `terraform plan`
