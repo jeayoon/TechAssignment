@@ -25,6 +25,7 @@ provider "aws" {
   region                   = var.region
 }
 
+##---------First Deploy---------
 ##VPC
 resource "aws_vpc" "main" {
   cidr_block = var.cidr
@@ -38,16 +39,20 @@ resource "aws_internet_gateway" "main" {
 ##Subnet
 resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = element(var.private_subnets, count.index)
-  availability_zone = element(var.availability_zones, count.index)
-  count             = length(var.private_subnets)
+  cidr_block        = cidrsubnet(aws_vpc.main.cidr_block, 8, 0) // 10.0.0.0/24
+  availability_zone = "${var.region}a"
 }
 
-resource "aws_subnet" "public" {
+resource "aws_subnet" "public-a" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = element(var.public_subnets, count.index)
-  availability_zone       = element(var.availability_zones, count.index)
-  count                   = length(var.public_subnets)
+  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, 1) // 10.0.1.0/24
+  availability_zone       = "${var.region}a"
+  map_public_ip_on_launch = true
+}
+resource "aws_subnet" "public-b" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, 2) // 10.0.2.0/24
+  availability_zone       = "${var.region}c"
   map_public_ip_on_launch = true
 }
 
@@ -62,42 +67,40 @@ resource "aws_route" "public" {
   gateway_id             = aws_internet_gateway.main.id
 }
 
-resource "aws_route_table_association" "public" {
-  count          = length(var.public_subnets)
-  subnet_id      = element(aws_subnet.public.*.id, count.index)
+resource "aws_route_table_association" "public-a" {
+  subnet_id      = aws_subnet.public-a.id
+  route_table_id = aws_route_table.public.id
+}
+resource "aws_route_table_association" "public-b" {
+  subnet_id      = aws_subnet.public-b.id
   route_table_id = aws_route_table.public.id
 }
 
 ## NAT
 resource "aws_nat_gateway" "main" {
-  count         = length(var.private_subnets)
-  allocation_id = element(aws_eip.nat.*.id, count.index)
-  subnet_id     = element(aws_subnet.public.*.id, count.index)
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public-a.id
   depends_on    = [aws_internet_gateway.main]
 }
 
 resource "aws_eip" "nat" {
-  count = length(var.private_subnets)
-  vpc   = true
+  vpc = true
 }
 
-## ROute Table Private
+## Route Table Private
 resource "aws_route_table" "private" {
-  count  = length(var.private_subnets)
   vpc_id = aws_vpc.main.id
 }
 
 resource "aws_route" "private" {
-  count                  = length(compact(var.private_subnets))
-  route_table_id         = element(aws_route_table.private.*.id, count.index)
+  route_table_id         = aws_route_table.private.id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = element(aws_nat_gateway.main.*.id, count.index)
+  nat_gateway_id         = aws_nat_gateway.main.id
 }
 
 resource "aws_route_table_association" "private" {
-  count          = length(var.private_subnets)
-  subnet_id      = element(aws_subnet.private.*.id, count.index)
-  route_table_id = element(aws_route_table.private.*.id, count.index)
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
 }
 
 ## Security Group
@@ -131,7 +134,7 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_security_group" "ecs_tasks" {
-  name   = "${var.environment}sg-task"
+  name   = "${var.environment}-sg-task"
   vpc_id = aws_vpc.main.id
 
   ingress {
@@ -176,6 +179,7 @@ resource "aws_ecr_lifecycle_policy" "main" {
   })
 }
 
+##---------Second Deploy---------
 ## ECS
 resource "aws_ecs_cluster" "main" {
   name = "${var.environment}-cluster"
@@ -188,12 +192,11 @@ resource "aws_ecs_task_definition" "main" {
   cpu                      = 256
   memory                   = 512
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
-  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
   container_definitions = jsonencode([{
-    name        = "${var.environment}-container"
-    image       = "${var.container_image}"
-    essential   = true
-    # environment = var.container_environment
+    name      = "${var.environment}-container"
+    image     = "${var.container_image}"
+    essential = true
     portMappings = [{
       protocol      = "tcp"
       containerPort = var.container_port
@@ -228,61 +231,6 @@ resource "aws_iam_role_policy_attachment" "ecs-task-execution-role-policy-attach
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-resource "aws_iam_role" "ecs_task_role" {
-  name = "${var.environment}-ecsTaskRole"
-
-  assume_role_policy = <<EOF
-{
- "Version": "2012-10-17",
- "Statement": [
-   {
-     "Action": "sts:AssumeRole",
-     "Principal": {
-       "Service": "ecs-tasks.amazonaws.com"
-     },
-     "Effect": "Allow",
-     "Sid": ""
-   }
- ]
-}
-EOF
-}
-
-resource "aws_iam_policy" "dynamodb" {
-  name        = "${var.environment}-task-policy-dynamodb"
-  description = "Policy that allows access to DynamoDB"
-
-  policy = <<EOF
-{
-   "Version": "2012-10-17",
-   "Statement": [
-       {
-           "Effect": "Allow",
-           "Action": [
-               "dynamodb:CreateTable",
-               "dynamodb:UpdateTimeToLive",
-               "dynamodb:PutItem",
-               "dynamodb:DescribeTable",
-               "dynamodb:ListTables",
-               "dynamodb:DeleteItem",
-               "dynamodb:GetItem",
-               "dynamodb:Scan",
-               "dynamodb:Query",
-               "dynamodb:UpdateItem",
-               "dynamodb:UpdateTable"
-           ],
-           "Resource": "*"
-       }
-   ]
-}
-EOF
-}
-
-resource "aws_iam_role_policy_attachment" "ecs-task-role-policy-attachment" {
-  role       = aws_iam_role.ecs_task_role.name
-  policy_arn = aws_iam_policy.dynamodb.arn
-}
-
 ## ECS
 resource "aws_ecs_service" "main" {
   name                               = "${var.environment}-service"
@@ -296,7 +244,7 @@ resource "aws_ecs_service" "main" {
 
   network_configuration {
     security_groups  = [aws_security_group.ecs_tasks.id]
-    subnets          = ["subnet-083ade4ad3948a05d"]
+    subnets          = [aws_subnet.private.id]
     assign_public_ip = false
   }
 
@@ -309,16 +257,16 @@ resource "aws_ecs_service" "main" {
   lifecycle {
     ignore_changes = [task_definition, desired_count]
   }
-  depends_on    = [aws_lb.main]
+  depends_on = [aws_lb.main]
 }
 
-## alb
+# alb
 resource "aws_lb" "main" {
   name               = "${var.environment}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = ["subnet-0952b3d370b8d96d9", "subnet-076c39471642e7fd8"]
+  subnets            = [aws_subnet.public-a.id, aws_subnet.public-b.id]
 
   enable_deletion_protection = false
 }
@@ -341,22 +289,6 @@ resource "aws_lb_target_group" "main" {
   }
 }
 
-# resource "aws_lb_listener" "http" {
-#   load_balancer_arn = aws_lb.main.id
-#   port              = 80
-#   protocol          = "HTTP"
-
-#   default_action {
-#    type = "redirect"
-
-#    redirect {
-#      port        = 443
-#      protocol    = "HTTPS"
-#      status_code = "HTTP_301"
-#    }
-#   }
-# }
-
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = "80"
@@ -368,20 +300,6 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# resource "aws_alb_listener" "https" {
-#   load_balancer_arn = aws_lb.main.id
-#   port              = 443
-#   protocol          = "HTTPS"
-
-#   ssl_policy        = "ELBSecurityPolicy-2016-08"
-#   certificate_arn   = var.alb_tls_cert_arn
-
-#   default_action {
-#     target_group_arn = aws_alb_target_group.main.id
-#     type             = "forward"
-#   }
-# }
-
 ## Autoscaling
 resource "aws_appautoscaling_target" "ecs_target" {
   max_capacity       = 4
@@ -391,8 +309,8 @@ resource "aws_appautoscaling_target" "ecs_target" {
   service_namespace  = "ecs"
 }
 
-resource "aws_appautoscaling_policy" "ecs_policy_memory" {
-  name               = "memory-autoscaling"
+resource "aws_appautoscaling_policy" "ecs_policy_alb" {
+  name               = "alb-req-autoscaling"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.ecs_target.resource_id
   scalable_dimension = aws_appautoscaling_target.ecs_target.scalable_dimension
@@ -400,25 +318,11 @@ resource "aws_appautoscaling_policy" "ecs_policy_memory" {
 
   target_tracking_scaling_policy_configuration {
     predefined_metric_specification {
-      predefined_metric_type = "ECSServiceAverageMemoryUtilization"
+      predefined_metric_type = "ALBRequestCountPerTarget"
+      resource_label         = "${aws_lb.main.arn_suffix}/${aws_lb_target_group.main.arn_suffix}"
     }
-
-    target_value = 80
-  }
-}
-
-resource "aws_appautoscaling_policy" "ecs_policy_cpu" {
-  name               = "cpu-autoscaling"
-  policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.ecs_target.resource_id
-  scalable_dimension = aws_appautoscaling_target.ecs_target.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.ecs_target.service_namespace
-
-  target_tracking_scaling_policy_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ECSServiceAverageCPUUtilization"
-    }
-
-    target_value = 60
+    target_value       = 4000
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 10
   }
 }

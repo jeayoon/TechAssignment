@@ -3,6 +3,7 @@
 *.tfstate.*.backup
 terraform.tfvars
 .terraform.lock.hcl
+planresult.txt
 # Module directory
 .terraform/
 .aws/*
