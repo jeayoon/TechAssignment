@@ -1,17 +1,15 @@
 #--------------------------------------------------------------
-# Variable Settings
+# Variables
 #--------------------------------------------------------------
-variable "cidr" {}
-variable "env" {}
+variable "ssmParam" {}
 
 #--------------------------------------------------------------
-# VPC Settings
+# SSM Parameter
 #--------------------------------------------------------------
-resource "aws_vpc" "main" {
-    cidr_block = var.cidr
-    enable_dns_support = true
-    enable_dns_hostnames = true
-    tags = {
-        Name = "${var.env}-vpc"
-    }
+resource "aws_ssm_parameter" "main" {
+  for_each = { for i in var.ssmParam : i.name => i }
+
+  name        = each.value.name
+  type        = each.value.type
+  value       = each.value.value
 }

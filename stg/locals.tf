@@ -186,6 +186,29 @@ locals {
     }
   }
 
+  ssmParam = {
+    dbHost = {
+      name = "WORDPRESS_DB_HOST"
+      type = "String"
+      value = aws_db_instance.rds.address
+    }
+    dbUser = {
+      name = "WORDPRESS_DB_USER"
+      type = "String"
+      value = "wordpress"
+    }
+    dbPW = {
+      name = "WORDPRESS_DB_PASSWORD"
+      type = "String"
+      value = "password"
+    }
+    dbName = {
+      name = "WORDPRESS_DB_NAME"
+      type = "String"
+      value = "wordpress"
+    }
+  }
+
 }
 
 # Output Mapping

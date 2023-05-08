@@ -78,54 +78,12 @@ module "securityGroupRules" {
   sg_rules = local.sg_rules
 }
 
-
 #--------------------------------------------------------------
-# Internet Gateway
+# SSM Parameter
 #--------------------------------------------------------------
-resource "aws_internet_gateway" "main" {
-  vpc_id = module.vpc.id
+module "ssmParam" {
+  source = "../modules/ssmParam"
 
-  tags = {
-    Name = "igw"
-  }
-}
-
-#--------------------------------------------------------------
-# Nat gateway
-#--------------------------------------------------------------
-resource "aws_eip" "natgw" {
-  vpc = true
-
-  tags = {
-    Name = "natgw-eip"
-  }
-}
-
-resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.natgw.id
-  subnet_id     = module.subnet.ids[var.subnet_names["pub1"]]
-
-  tags = {
-    Name = "natgw"
-  }
-
-  depends_on = [aws_internet_gateway.main]
-}
-
-#--------------------------------------------------------------
-# Route
-#--------------------------------------------------------------
-resource "aws_route" "public" {
-  route_table_id         = module.routeTable.ids[var.rt_names["pub1"]]
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.main.id
-  depends_on             = [module.routeTable]
-}
-
-resource "aws_route" "dmz" {
-  route_table_id         = module.routeTable.ids[var.rt_names["dmz1"]]
-  destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.main.id
-  depends_on             = [module.routeTable]
+  ssmParam = local.ssmParam
 }
 
