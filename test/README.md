@@ -1,6 +1,6 @@
 ## 목적
 
-AWS Fargate Auto Scaling 시연을 Terraform으로 구현
+AWS Fargate Auto Scaling 시연을 [Terraform으로 구현](https://github.com/jeayoon/TechAssignment/blob/main/test/main.tf)
 
 ## Architecture
 
@@ -15,6 +15,7 @@ AWS Fargate Auto Scaling 시연을 Terraform으로 구현
 * 결과 : 아래의 이미지 최소 작업 수(BlueBox), 부하테스트 실행 후 최대 작업 수(RedBox) 동작 확인
 
 ![ECSAutoScalingTestResult](https://user-images.githubusercontent.com/17561411/236883339-deb9e15c-2091-4c58-9811-60e7ecd7f58e.jpg)
+
 
 ## Terraform version
 
