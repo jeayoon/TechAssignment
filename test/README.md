@@ -4,7 +4,7 @@ AWS Fargate Auto Scaling 시연을 Terraform으로 구현
 
 ## Architecture
 
-![AWS_FargateTest](https://user-images.githubusercontent.com/17561411/236893838-3bfe6246-8413-4bcd-b926-b34a0a1eff0a.jpg)
+![AWSFargate](https://github.com/jeayoon/TechAssignment/assets/17561411/4022746e-f3ca-422d-aefe-cc495300d72c)
 
 
 ## AWS Fargate Auto Scaling 시연 결과
