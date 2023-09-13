@@ -27,6 +27,6 @@ variable "container_port" {
 }
 variable "container_image" {
   type        = string
-  default     = "253854447487.dkr.ecr.ap-northeast-1.amazonaws.com/ecr-test:latest" ## ECR Image URL : 123456789012.dkr.ecr.$REGION_NAME.amazonaws.com/ecr-test:latest
+  default     = "" ## ECR Image URL : 123456789012.dkr.ecr.$REGION_NAME.amazonaws.com/ecr-test:latest
   description = "Docker image to be launched"
 }
