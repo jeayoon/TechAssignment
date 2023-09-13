@@ -4,7 +4,7 @@ AWS Fargate Auto Scaling 시연을 [Terraform으로 구현](https://github.com/j
 
 ## Architecture
 
-![AWSFargate](https://github.com/jeayoon/TechAssignment/assets/17561411/4022746e-f3ca-422d-aefe-cc495300d72c)
+![Fargate](https://github.com/jeayoon/TechAssignment/assets/17561411/64d5f9e3-f6bb-4c76-9639-95d86fdfe5ba)
 
 
 ## AWS Fargate Auto Scaling 시연 결과
@@ -33,6 +33,7 @@ Terraform v1.4.5
    3. `terraform apply`
 4. Docker Image를 ECR에 Push
    1. ECR 작성 후 `푸시 명령 보기` 순서대로 실행 (Dockerfile파일有)
+      1. Mac M1&M2일경우 `--platform linux/amd64` 옵션이 필요. (e.g. `docker build --platform linux/amd64 -t ecr-test .`)
 5. `vars.tf`에서 `container_image`에 ECR image URL을 입력
 6. ALB,ECS Deploy
    1. 3번에서 Command out부분을 삭제

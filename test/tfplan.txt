@@ -1,0 +1,209 @@
+aws_cloudwatch_log_group.nginx: Refreshing state... [id=/ecs/logs/terraform/nginx]
+aws_eip.eip_1c: Refreshing state... [id=eipalloc-0be0188bd624c93f4]
+aws_vpc.main: Refreshing state... [id=vpc-0ef3730f1fc23d982]
+aws_ecs_cluster.main: Refreshing state... [id=arn:aws:ecs:ap-northeast-1:253854447487:cluster/tf-custer]
+aws_iam_role.ecs_task_execution_role: Refreshing state... [id=test-ecsTaskExecutionRole]
+aws_eip.eip_1a: Refreshing state... [id=eipalloc-0d4103c16b487759d]
+aws_ecs_cluster_capacity_providers.main: Refreshing state... [id=tf-custer]
+aws_subnet.private-c: Refreshing state... [id=subnet-0b89440faf5fbece4]
+aws_route_table.private-c: Refreshing state... [id=rtb-04d256bbb11334fe5]
+aws_internet_gateway.main: Refreshing state... [id=igw-083f2c5af5522b838]
+aws_security_group.app: Refreshing state... [id=sg-09d41be808309407b]
+aws_subnet.public-a: Refreshing state... [id=subnet-09d3ccccf4b05366a]
+aws_subnet.private-a: Refreshing state... [id=subnet-06943c2558bfb2938]
+aws_security_group.alb: Refreshing state... [id=sg-0da716c6922faa61c]
+aws_subnet.public-c: Refreshing state... [id=subnet-0c95fb970fef69c12]
+aws_route_table.public: Refreshing state... [id=rtb-0bf684afd8b3f341c]
+aws_route_table.private-a: Refreshing state... [id=rtb-037967404487b51e2]
+aws_route_table_association.private-c: Refreshing state... [id=rtbassoc-0c326f7a53308f604]
+aws_nat_gateway.nat_1a: Refreshing state... [id=nat-032f4d5b73fb66105]
+aws_nat_gateway.nat_1c: Refreshing state... [id=nat-0553f2103be208a8d]
+aws_security_group_rule.allow_http_inbound: Refreshing state... [id=sgrule-3998878322]
+aws_route_table_association.private-a: Refreshing state... [id=rtbassoc-0fc619bf7d49b9965]
+aws_security_group_rule.allow_every_outbound: Refreshing state... [id=sgrule-1382483052]
+aws_security_group_rule.allow_app_sg_outbound: Refreshing state... [id=sgrule-3707679434]
+aws_security_group_rule.allow_alb_sg_inbound: Refreshing state... [id=sgrule-2224667147]
+aws_route.private-a: Refreshing state... [id=r-rtb-037967404487b51e21080289494]
+aws_route.private-c: Refreshing state... [id=r-rtb-04d256bbb11334fe51080289494]
+aws_route_table_association.public-a: Refreshing state... [id=rtbassoc-02381b326ca55b4f9]
+aws_route_table_association.public-c: Refreshing state... [id=rtbassoc-0628fb3282684469b]
+aws_route.public: Refreshing state... [id=r-rtb-0bf684afd8b3f341c1080289494]
+aws_iam_role_policy_attachment.ecs-task-execution-role-policy-attachment: Refreshing state... [id=test-ecsTaskExecutionRole-20230913052929536300000001]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # aws_ecs_service.main will be created
+  + resource "aws_ecs_service" "main" {
+      + cluster                            = "arn:aws:ecs:ap-northeast-1:253854447487:cluster/tf-custer"
+      + deployment_maximum_percent         = 200
+      + deployment_minimum_healthy_percent = 50
+      + desired_count                      = 2
+      + enable_ecs_managed_tags            = false
+      + enable_execute_command             = false
+      + iam_role                           = (known after apply)
+      + id                                 = (known after apply)
+      + launch_type                        = "FARGATE"
+      + name                               = "test-service"
+      + platform_version                   = (known after apply)
+      + scheduling_strategy                = "REPLICA"
+      + tags_all                           = (known after apply)
+      + task_definition                    = (known after apply)
+      + triggers                           = (known after apply)
+      + wait_for_steady_state              = false
+
+      + load_balancer {
+          + container_name   = "test-container"
+          + container_port   = 80
+          + target_group_arn = (known after apply)
+        }
+
+      + network_configuration {
+          + assign_public_ip = false
+          + security_groups  = [
+              + "sg-09d41be808309407b",
+            ]
+          + subnets          = [
+              + "subnet-06943c2558bfb2938",
+              + "subnet-0b89440faf5fbece4",
+            ]
+        }
+    }
+
+  # aws_ecs_task_definition.main will be created
+  + resource "aws_ecs_task_definition" "main" {
+      + arn                      = (known after apply)
+      + arn_without_revision     = (known after apply)
+      + container_definitions    = jsonencode(
+            [
+              + {
+                  + cpu              = 256
+                  + essential        = true
+                  + image            = "253854447487.dkr.ecr.ap-northeast-1.amazonaws.com/ecr-test:latest"
+                  + logConfiguration = {
+                      + logDriver = "awslogs"
+                      + options   = {
+                          + awslogs-group         = "/ecs/logs/terraform/nginx"
+                          + awslogs-region        = "ap-northeast-1"
+                          + awslogs-stream-prefix = "terraform"
+                        }
+                    }
+                  + memory           = 128
+                  + name             = "test-container"
+                  + portMappings     = [
+                      + {
+                          + containerPort = 80
+                          + hostPort      = 80
+                          + protocol      = "tcp"
+                        },
+                    ]
+                },
+            ]
+        )
+      + cpu                      = "256"
+      + execution_role_arn       = "arn:aws:iam::253854447487:role/test-ecsTaskExecutionRole"
+      + family                   = "test-task-def"
+      + id                       = (known after apply)
+      + memory                   = "512"
+      + network_mode             = "awsvpc"
+      + requires_compatibilities = [
+          + "FARGATE",
+        ]
+      + revision                 = (known after apply)
+      + skip_destroy             = false
+      + tags_all                 = (known after apply)
+    }
+
+  # aws_lb.main will be created
+  + resource "aws_lb" "main" {
+      + arn                                         = (known after apply)
+      + arn_suffix                                  = (known after apply)
+      + desync_mitigation_mode                      = "defensive"
+      + dns_name                                    = (known after apply)
+      + drop_invalid_header_fields                  = false
+      + enable_deletion_protection                  = false
+      + enable_http2                                = true
+      + enable_tls_version_and_cipher_suite_headers = false
+      + enable_waf_fail_open                        = false
+      + enable_xff_client_port                      = false
+      + id                                          = (known after apply)
+      + idle_timeout                                = 60
+      + internal                                    = false
+      + ip_address_type                             = (known after apply)
+      + load_balancer_type                          = "application"
+      + name                                        = "test-alb"
+      + preserve_host_header                        = false
+      + security_groups                             = [
+          + "sg-0da716c6922faa61c",
+        ]
+      + subnets                                     = [
+          + "subnet-09d3ccccf4b05366a",
+          + "subnet-0c95fb970fef69c12",
+        ]
+      + tags_all                                    = (known after apply)
+      + vpc_id                                      = (known after apply)
+      + xff_header_processing_mode                  = "append"
+      + zone_id                                     = (known after apply)
+    }
+
+  # aws_lb_listener.http will be created
+  + resource "aws_lb_listener" "http" {
+      + arn               = (known after apply)
+      + id                = (known after apply)
+      + load_balancer_arn = (known after apply)
+      + port              = 80
+      + protocol          = "HTTP"
+      + ssl_policy        = (known after apply)
+      + tags_all          = (known after apply)
+
+      + default_action {
+          + order            = (known after apply)
+          + target_group_arn = (known after apply)
+          + type             = "forward"
+        }
+    }
+
+  # aws_lb_target_group.main will be created
+  + resource "aws_lb_target_group" "main" {
+      + arn                                = (known after apply)
+      + arn_suffix                         = (known after apply)
+      + connection_termination             = false
+      + deregistration_delay               = "300"
+      + id                                 = (known after apply)
+      + ip_address_type                    = (known after apply)
+      + lambda_multi_value_headers_enabled = false
+      + load_balancing_algorithm_type      = (known after apply)
+      + load_balancing_cross_zone_enabled  = (known after apply)
+      + name                               = "test-alb-tg"
+      + port                               = 80
+      + preserve_client_ip                 = (known after apply)
+      + protocol                           = "HTTP"
+      + protocol_version                   = (known after apply)
+      + proxy_protocol_v2                  = false
+      + slow_start                         = 0
+      + tags_all                           = (known after apply)
+      + target_type                        = "ip"
+      + vpc_id                             = "vpc-0ef3730f1fc23d982"
+
+      + health_check {
+          + enabled             = true
+          + healthy_threshold   = 3
+          + interval            = 30
+          + matcher             = "200"
+          + path                = "/"
+          + port                = "traffic-port"
+          + protocol            = "HTTP"
+          + timeout             = 3
+          + unhealthy_threshold = 2
+        }
+    }
+
+Plan: 5 to add, 0 to change, 0 to destroy.
+
+─────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.
