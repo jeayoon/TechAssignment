@@ -183,6 +183,14 @@ resource "aws_security_group_rule" "allow_http_inbound" {
   security_group_id = aws_security_group.alb.id
   cidr_blocks       = ["0.0.0.0/0"]
 }
+# resource "aws_security_group_rule" "allow_test_inbound" {
+#   type              = "ingress"
+#   from_port         = 8080
+#   to_port           = 8080
+#   protocol          = "tcp"
+#   security_group_id = aws_security_group.alb.id
+#   cidr_blocks       = ["0.0.0.0/0"]
+# }
 
 resource "aws_security_group_rule" "allow_app_sg_outbound" {
   type                     = "egress"
@@ -192,32 +200,40 @@ resource "aws_security_group_rule" "allow_app_sg_outbound" {
   security_group_id        = aws_security_group.alb.id
   source_security_group_id = aws_security_group.app.id
 }
+# resource "aws_security_group_rule" "allow_app_test_sg_outbound" {
+#   type                     = "egress"
+#   from_port                = 8080
+#   to_port                  = 8080
+#   protocol                 = "tcp"
+#   security_group_id        = aws_security_group.alb.id
+#   source_security_group_id = aws_security_group.app.id
+# }
 
 ## ECR
-resource "aws_ecr_repository" "main" {
-  name                 = "ecr-${var.environment}"
-  image_tag_mutability = "MUTABLE"
-  tags                 = merge(var.tags, {})
-}
+# resource "aws_ecr_repository" "main" {
+#   name                 = "ecr-${var.environment}"
+#   image_tag_mutability = "MUTABLE"
+#   tags                 = merge(var.tags, {})
+# }
 
-resource "aws_ecr_lifecycle_policy" "main" {
-  repository = aws_ecr_repository.main.name
+# resource "aws_ecr_lifecycle_policy" "main" {
+#   repository = aws_ecr_repository.main.name
 
-  policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "keep last 10 images"
-      action = {
-        type = "expire"
-      }
-      selection = {
-        tagStatus   = "any"
-        countType   = "imageCountMoreThan"
-        countNumber = 10
-      }
-    }]
-  })
-}
+#   policy = jsonencode({
+#     rules = [{
+#       rulePriority = 1
+#       description  = "keep last 10 images"
+#       action = {
+#         type = "expire"
+#       }
+#       selection = {
+#         tagStatus   = "any"
+#         countType   = "imageCountMoreThan"
+#         countNumber = 10
+#       }
+#     }]
+#   })
+# }
 
 ###---------Second Deploy---------
 ## ECS Clouster
@@ -274,11 +290,11 @@ resource "aws_ecs_task_definition" "main" {
 
   container_definitions = jsonencode([
     {
-      "name" : "${var.environment}-container",
+      "name" : local.container_name,
       "image" : "${var.container_image}",
       "cpu" : 256,
       "essential" : true,
-      "memory" : 128,
+      "memory" : 512,
       "portMappings" : [
         {
           "protocol" : "tcp",
@@ -302,28 +318,36 @@ resource "aws_ecs_service" "main" {
   name                               = "${var.environment}-service"
   cluster                            = aws_ecs_cluster.main.id
   task_definition                    = aws_ecs_task_definition.main.arn
-  desired_count                      = 2
+  desired_count                      = 1
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
   launch_type                        = "FARGATE"
   scheduling_strategy                = "REPLICA"
 
   network_configuration {
-    security_groups  = [aws_security_group.app.id]
-    subnets          = [aws_subnet.private-a.id, aws_subnet.private-c.id]
+    security_groups = [aws_security_group.app.id]
+    subnets         = [aws_subnet.private-a.id, aws_subnet.private-c.id]
+
     assign_public_ip = false
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.main.arn
-    container_name   = "${var.environment}-container"
+    target_group_arn = aws_lb_target_group.main.arn // blue
+    container_name   = local.container_name
     container_port   = var.container_port
   }
 
+  # force_new_deployment = true
+
+  deployment_controller {
+    type = "CODE_DEPLOY"
+  }
+
   lifecycle {
-    ignore_changes = [task_definition, desired_count]
+    ignore_changes = [task_definition, desired_count, load_balancer]
   }
   depends_on = [aws_lb.main]
+
 }
 
 # alb
@@ -337,8 +361,26 @@ resource "aws_lb" "main" {
   enable_deletion_protection = false
 }
 
-resource "aws_lb_target_group" "main" {
+resource "aws_lb_target_group" "main" { // blue
   name        = "${var.environment}-alb-tg"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    healthy_threshold   = "3"
+    interval            = "30"
+    protocol            = "HTTP"
+    matcher             = "200"
+    timeout             = "3"
+    path                = "/"
+    unhealthy_threshold = "2"
+  }
+}
+
+resource "aws_lb_target_group" "main2" { // green
+  name        = "${var.environment}-alb-tg-green"
   port        = 80
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
@@ -364,31 +406,52 @@ resource "aws_lb_listener" "http" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.main.arn
   }
+
+  lifecycle {
+    ignore_changes = [default_action]
+  }
 }
 
-# ## Autoscaling
-# resource "aws_appautoscaling_target" "ecs_target" {
-#   max_capacity       = 4
-#   min_capacity       = 1
-#   resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.main.name}"
-#   scalable_dimension = "ecs:service:DesiredCount"
-#   service_namespace  = "ecs"
-# }
+# resource "aws_lb_listener" "test" {
+#   load_balancer_arn = aws_lb.main.arn
+#   port              = 8080
+#   protocol          = "HTTP"
 
-# resource "aws_appautoscaling_policy" "ecs_policy_alb" {
-#   name               = "alb-req-autoscaling"
-#   policy_type        = "TargetTrackingScaling"
-#   resource_id        = aws_appautoscaling_target.ecs_target.resource_id
-#   scalable_dimension = aws_appautoscaling_target.ecs_target.scalable_dimension
-#   service_namespace  = aws_appautoscaling_target.ecs_target.service_namespace
+#   default_action {
+#     type             = "forward"
+#     target_group_arn = aws_lb_target_group.main2.arn
+#   }
 
-#   target_tracking_scaling_policy_configuration {
-#     predefined_metric_specification {
-#       predefined_metric_type = "ALBRequestCountPerTarget"
-#       resource_label         = "${aws_lb.main.arn_suffix}/${aws_lb_target_group.main.arn_suffix}"
-#     }
-#     target_value       = 4000
-#     scale_in_cooldown  = 300
-#     scale_out_cooldown = 10
+#   lifecycle {
+#     ignore_changes = [default_action]
 #   }
 # }
+
+## Autoscaling group
+resource "aws_appautoscaling_target" "ecs_target" {
+  max_capacity       = 4
+  min_capacity       = 1
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.main.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "ecs_policy_alb" {
+  name               = "alb-req-autoscaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.ecs_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.ecs_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.ecs_target.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ALBRequestCountPerTarget"
+      resource_label         = "${aws_lb.main.arn_suffix}/${aws_lb_target_group.main.arn_suffix}"
+    }
+    target_value       = 4000
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 10
+  }
+}
+
+

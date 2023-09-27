@@ -1,0 +1,30 @@
+{
+	"containerDefinitions": [{
+		"name": "test-container",
+		"image": "AWS_ACCOUNT_ID.dkr.ecr.ap-northeast-1.amazonaws.com/ecr-test:latest",
+		"essential": true,
+		"cpu": 256,
+        "memory": 512,
+		"portMappings": [{
+			"hostPort": 80,
+			"protocol": "tcp",
+			"containerPort": 80
+		}],
+		"logConfiguration": {
+			"logDriver": "awslogs",
+			"options": {
+				"awslogs-group": "/ecs/logs/terraform/nginx",
+				"awslogs-region": "ap-northeast-1",
+				"awslogs-stream-prefix": "terraform"
+			}
+		}
+	}],
+	"cpu": "256",
+	"memory": "512",
+	"executionRoleArn": "arn:aws:iam::AWS_ACCOUNT_ID:role/test-ecsTaskExecutionRole",
+	"family": "test-task-def",
+	"networkMode": "awsvpc",
+	"requiresCompatibilities": [
+		"FARGATE"
+	]
+}

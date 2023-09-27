@@ -30,3 +30,14 @@ variable "container_image" {
   default     = "" ## ECR Image URL : 123456789012.dkr.ecr.$REGION_NAME.amazonaws.com/ecr-test:latest
   description = "Docker image to be launched"
 }
+
+variable "ecr_name" {
+  type    = string
+  default = "ecr-test"
+}
+
+variable "param_store_name" {
+  type        = string
+  default     = "MY_ACCOUNT_ID"
+  description = "account id stored in the ssm parameter store"
+}
