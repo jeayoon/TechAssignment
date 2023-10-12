@@ -66,6 +66,14 @@ resource "aws_subnet" "public-c" {
   map_public_ip_on_launch = true
   tags                    = merge(var.tags, { "Name" = "pub_sub02_c" })
 }
+resource "aws_subnet" "public-a2" { // For Elastic Cache
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, 5) // 10.0.3.0/24
+  availability_zone       = "${var.region}a"
+  map_public_ip_on_launch = true
+  tags                    = merge(var.tags, { "Name" = "pub_sub03_c" })
+}
+
 
 ## NAT
 
@@ -111,6 +119,10 @@ resource "aws_route_table_association" "public-a" {
 }
 resource "aws_route_table_association" "public-c" {
   subnet_id      = aws_subnet.public-c.id
+  route_table_id = aws_route_table.public.id
+}
+resource "aws_route_table_association" "public-a2" {
+  subnet_id      = aws_subnet.public-a2.id
   route_table_id = aws_route_table.public.id
 }
 
@@ -159,6 +171,14 @@ resource "aws_security_group_rule" "allow_alb_sg_inbound" {
   security_group_id        = aws_security_group.app.id
   source_security_group_id = aws_security_group.alb.id
 }
+resource "aws_security_group_rule" "allow_alb_sg_inbound2" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.app.id
+  source_security_group_id = aws_security_group.alb.id
+}
 
 resource "aws_security_group_rule" "allow_every_outbound" {
   type              = "egress"
@@ -183,14 +203,14 @@ resource "aws_security_group_rule" "allow_http_inbound" {
   security_group_id = aws_security_group.alb.id
   cidr_blocks       = ["0.0.0.0/0"]
 }
-# resource "aws_security_group_rule" "allow_test_inbound" {
-#   type              = "ingress"
-#   from_port         = 8080
-#   to_port           = 8080
-#   protocol          = "tcp"
-#   security_group_id = aws_security_group.alb.id
-#   cidr_blocks       = ["0.0.0.0/0"]
-# }
+resource "aws_security_group_rule" "allow_https_inbound" {
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.alb.id
+  cidr_blocks       = ["0.0.0.0/0"]
+}
 
 resource "aws_security_group_rule" "allow_app_sg_outbound" {
   type                     = "egress"
@@ -200,14 +220,70 @@ resource "aws_security_group_rule" "allow_app_sg_outbound" {
   security_group_id        = aws_security_group.alb.id
   source_security_group_id = aws_security_group.app.id
 }
-# resource "aws_security_group_rule" "allow_app_test_sg_outbound" {
-#   type                     = "egress"
-#   from_port                = 8080
-#   to_port                  = 8080
-#   protocol                 = "tcp"
-#   security_group_id        = aws_security_group.alb.id
-#   source_security_group_id = aws_security_group.app.id
-# }
+
+# Test Elastic SG
+resource "aws_security_group" "elastic" {
+  name   = "test-elastic-sg"
+  vpc_id = aws_vpc.main.id
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "test-elastic-sg"
+  }
+}
+
+## NACL
+resource "aws_network_acl" "private1" {
+  vpc_id     = aws_vpc.main.id
+  subnet_ids = [aws_subnet.private-a.id, aws_subnet.private-c.id]
+
+  egress {
+    protocol   = -1
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  ingress {
+    protocol   = -1
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  tags = {
+    Name = "${var.environment}-fargate-nacl"
+  }
+}
 
 ## ECR
 # resource "aws_ecr_repository" "main" {
@@ -279,6 +355,31 @@ resource "aws_iam_role_policy_attachment" "ecs-task-execution-role-policy-attach
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role" "task_execution_role" {
+  name = "${var.environment}-taskExecutionRole"
+
+  assume_role_policy = <<EOF
+{
+ "Version": "2012-10-17",
+ "Statement": [
+   {
+     "Action": "sts:AssumeRole",
+     "Principal": {
+       "Service": "ecs-tasks.amazonaws.com"
+     },
+     "Effect": "Allow",
+     "Sid": ""
+   }
+ ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy" "task-policy" {
+  role   = aws_iam_role.task_execution_role.name
+  policy = templatefile("./files/ecs_task_policy.json.tpl", {})
+}
+
 ## ECS
 resource "aws_ecs_task_definition" "main" {
   family                   = "${var.environment}-task-def"
@@ -287,6 +388,7 @@ resource "aws_ecs_task_definition" "main" {
   cpu                      = 256
   memory                   = 512
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  task_role_arn            = aws_iam_role.task_execution_role.arn
 
   container_definitions = jsonencode([
     {
@@ -323,6 +425,7 @@ resource "aws_ecs_service" "main" {
   deployment_maximum_percent         = 200
   launch_type                        = "FARGATE"
   scheduling_strategy                = "REPLICA"
+  enable_execute_command             = true
 
   network_configuration {
     security_groups = [aws_security_group.app.id]
